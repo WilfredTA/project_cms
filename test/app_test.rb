@@ -28,7 +28,12 @@ class AppTest < Minitest::Test
     end
   end
 
+  def sign_in
+    post "/users/signin", username: 'admin', password: 'secret'
+  end
+
   def test_contents
+    sign_in
     create_document "about.txt"
     create_document "changes.txt"
 
@@ -51,6 +56,7 @@ class AppTest < Minitest::Test
   end
 
   def test_false_file
+    sign_in
     get '/random.ext'
 
     assert_equal 302, last_response.status
@@ -120,6 +126,7 @@ class AppTest < Minitest::Test
   end
 
   def test_delete_file
+    sign_in
     create_document "/test.txt"
     post '/test.txt/delete'
     assert_equal 302, last_response.status
@@ -127,8 +134,39 @@ class AppTest < Minitest::Test
     get last_response['Location']
     assert_equal 200, last_response.status
     assert_includes last_response.body, "test.txt was deleted"
+  end
+
+  def test_redirect_login_page_if_not_signed_in
+    get '/'
+
+    assert_equal 302, last_response.status
+    assert_includes last_response.body, "Username"
+    assert_includes last_response.body, "Password"
 
   end
 
+  def test_sign_in_correct_credentials
+    post "/users/signin", username: "admin", password: "secret"
+
+    get last_response['Location']
+
+    assert_equal 200, last_response.status
+    assert_includes last_response.body, "Welcome"
+    assert_includes last_response.body, "Sign out"
+
+    post "/users/signout"
+    assert_equal 302, last_response.status
+
+    get last_response['Location']
+    assert_includes last_response.body, 'Username'
+    assert_includes last_response.body, 'Password'
+  end
+
+  def test_sign_in_incorrect_credentials
+    post "/users/signin", username: "something", password: "something"
+
+    assert_includes last_response.body, "Invalid credentials"
+    assert_equal 422, last_response.status
+  end
 
 end

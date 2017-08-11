@@ -40,6 +40,11 @@ def load_file_content(file_path)
 	end
 end
 
+def valid_credentials?
+	session[:username] == "admin" &&
+	session[:password] == "secret"
+end
+
 
 helpers do
 	def path_to(file, dir)
@@ -49,12 +54,13 @@ end
 
 
 
-
 get '/' do
+	redirect '/users/signin' unless valid_credentials?
 	pattern = File.join(data_path, "*")
 	@contents = Dir.glob(pattern).map do |path|
 		File.basename(path)
 	end
+
 	erb :contents, layout: :layout
 end
 
@@ -106,7 +112,7 @@ post '/document/new' do
 		redirect '/'
 	else
 		session[:message] = "File extension must be .md or .txt"
-		erb :new
+		erb :new, layout: :layout
 	end
 end
 
@@ -117,8 +123,39 @@ post '/:file/delete' do
 	redirect '/'
 end
 
+get '/users/signin' do
+	erb :signin, layout: :layout
+end
 
-# Index page has link to delete
-# Deleting document should delete document and display a message "File has been deleted"
+post '/users/signin' do
+	session[:username] = params[:username]
+	session[:password] = params[:password]
+	if valid_credentials?
+		session[:message] = "Welcome!"
+		redirect '/'
+	else
+		session[:message] = "Invalid credentials"
+		status 422
+		erb :signin, layout: :layout
+	end
+end
 
-#
+post '/users/signout' do
+	session.delete(:username)
+	session.delete(:password)
+	session[:message] = "You have been signed out"
+	redirect '/users/signin'
+end
+
+
+# Signed out users redirected to sign in page
+# Once signed in, redirected to index page
+# Welcome mesage at top of index
+# Signed in as admin message at the botton, and sign out button
+# Entering wrong credentials into sign-in reloads template with error message
+
+# test signing in w/ correct credentials
+# test signing in w/ incorrect
+# test signing out
+
+

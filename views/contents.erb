@@ -12,3 +12,9 @@
 </ul>
 
 <a href="/document/new"> New Document </a>
+
+
+<p class="userbar">Signed in as <%=session[:username]%></p>
+<form class="inline" action="/users/signout" method="post">
+	<button type="submit"> Sign out </button>
+</form>

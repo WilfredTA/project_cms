@@ -11,3 +11,8 @@ body {
 form.inline {
   display: inline;
 }
+
+p.userbar {
+
+	font-style: italic;
+}
