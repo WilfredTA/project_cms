@@ -87,6 +87,7 @@ class AppTest < Minitest::Test
   end
 
   def test_submitting_edits
+    sign_in
     post '/changes.txt', new_content: "Hello minitest"
     assert_equal 302, last_response.status
 
