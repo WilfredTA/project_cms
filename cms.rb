@@ -2,6 +2,8 @@ require 'sinatra'
 require 'sinatra/reloader'
 require 'tilt/erubis'
 require 'redcarpet'
+require 'yaml'
+require 'bcrypt'
 
 
 configure do
@@ -40,9 +42,39 @@ def load_file_content(file_path)
 	end
 end
 
-def valid_credentials?
-	session[:username] == "admin" &&
-	session[:password] == "secret"
+def load_user_credentials
+	if ENV["RACK_ENV"] == "test"
+		user_path = File.expand_path("../test/users.yml", __FILE__)
+	else
+		user_path = File.expand_path("../users.yml", __FILE__)
+	end
+	YAML.load_file(user_path)
+end
+
+def valid_credentials?(username, password)
+	credentials = load_user_credentials
+	stored_password = credentials[username]
+
+	if credentials.keys.include?(username)
+		hashed_password = BCrypt::Password.new(stored_password) # constructor makes sure the hash is valid otherwise raises error
+		hashed_password == password # makes sure the validated stored hash is the same as input password
+	else
+		false
+	end
+end
+
+# Since the username key is never added unless the credentials are valid,
+# it is sufficient to test whether the key even exists to see whether the user
+# is logged in, or not.
+def signed_in?
+	session.key?(:username)
+end
+
+def redirect_non_users
+	if !signed_in?
+		session[:message] = "You must be signed in to do that"
+		redirect '/'
+	end
 end
 
 
@@ -55,7 +87,7 @@ end
 
 
 get '/' do
-	redirect '/users/signin' unless valid_credentials?
+	redirect '/users/signin' if !signed_in?
 	pattern = File.join(data_path, "*")
 	@contents = Dir.glob(pattern).map do |path|
 		File.basename(path)
@@ -82,15 +114,16 @@ get '/:text_file' do
 end
 
 get '/:text_file/edit' do
+	redirect_non_users
 	@file_name = params[:text_file]
 	file_path = File.join(data_path, @file_name)
 	@content = File.read(file_path)
-	headers['Content-Type'] = "text/html"
 
 	erb :edit, layout: :layout
 end
 
 post '/:text_file' do
+	redirect_non_users
 	file_path = File.join(data_path, params[:text_file])
 	new_content = params[:new_content]
 	File.write(file_path, new_content)
@@ -99,11 +132,12 @@ post '/:text_file' do
 end
 
 get '/document/new' do
-
+	redirect_non_users
 	erb :new, layout: :layout
 end
 
 post '/document/new' do
+	redirect_non_users
 	document_name = params[:new_doc]
 	file_name = File.join(data_path, document_name)
 	new_file = File.new(file_name, 'w+')
@@ -117,6 +151,7 @@ post '/document/new' do
 end
 
 post '/:file/delete' do
+	redirect_non_users
 	file_name = File.join(data_path, params[:file])
 	File.delete(file_name)
 	session[:message] = "#{params[:file]} was deleted"
@@ -128,9 +163,10 @@ get '/users/signin' do
 end
 
 post '/users/signin' do
-	session[:username] = params[:username]
-	session[:password] = params[:password]
-	if valid_credentials?
+	username, password = params[:username], params[:password]
+	
+	if valid_credentials?(username, password)
+		session[:username] = username
 		session[:message] = "Welcome!"
 		redirect '/'
 	else
@@ -147,15 +183,5 @@ post '/users/signout' do
 	redirect '/users/signin'
 end
 
-
-# Signed out users redirected to sign in page
-# Once signed in, redirected to index page
-# Welcome mesage at top of index
-# Signed in as admin message at the botton, and sign out button
-# Entering wrong credentials into sign-in reloads template with error message
-
-# test signing in w/ correct credentials
-# test signing in w/ incorrect
-# test signing out
 
 
